@@ -4,29 +4,41 @@ import PIL
 import PIL.Image
 import tensorflow as tf
 import matplotlib.pyplot as plt
+import matplotlib.image as mpimg
 from tensorflow import keras
 from tensorflow.keras import layers
 from tensorflow.keras.models import Sequential
 
 print(tf.__version__)
 
-EPOCHS = 20
-TRAIN_MODEL = False
+EPOCHS = 22 #22
+TRAIN_MODEL = not True
 LOAD_MODEL = not TRAIN_MODEL
+TRAIN_VAL_SPLIT = 0.4
 
-batch_size = 32
-img_height = 180
-img_width = 180
+CONV_LYR_1_FLTRS = 24
+CONV_LYR_2_FLTRS = 50
+DROPOUT_LYR_VAL = 0.2
+DENSE_LYR_FINAL_UNITS = 32
+
+batch_size = 16
+img_height = 240
+img_width = 320
+
+SHOW_FALSE_IMAGES = not False
+
+
+# complete path to test-pic
+img_filename = 'Test-PicB - 1.jpeg'
+img_path = '/Users/floriancarstens/Hundeerkennung/pictures/test_pics/'
 
 import pathlib
-
-
 
 dataset_url = "https://storage.googleapis.com/download.tensorflow.org/example_images/flower_photos.tgz"
 ### TODO:CHANGE THIS TO MY NEW PATH! ###
 ### Reicht wenn ich eine ähnliche Verzeichnisstruktur für meine Fotos nutze
 ### --> Klassen + Labels werden automatisch gebildet ;-)
-archive = '/Users/floriancarstens/.keras/datasets/flower_photos' #tf.keras.utils.get_file(origin=dataset_url, extract=True)
+archive = '/Users/floriancarstens/Hundeerkennung/pictures/training_pics' #tf.keras.utils.get_file(origin=dataset_url, extract=True)
 data_dir = pathlib.Path(archive).with_suffix('')
 print(data_dir)
 
@@ -37,7 +49,7 @@ print(image_count)
 
 train_ds = tf.keras.utils.image_dataset_from_directory(
   data_dir,
-  validation_split=0.2,
+  validation_split=TRAIN_VAL_SPLIT,
   subset="training",
   seed=123,
   image_size=(img_height, img_width),
@@ -45,7 +57,7 @@ train_ds = tf.keras.utils.image_dataset_from_directory(
 
 val_ds = tf.keras.utils.image_dataset_from_directory(
   data_dir,
-  validation_split=0.2,
+  validation_split=TRAIN_VAL_SPLIT,
   subset="validation",
   seed=123,
   image_size=(img_height, img_width),
@@ -62,15 +74,15 @@ if TRAIN_MODEL:
   Here are the first nine images from the training dataset.
   """
 
-  print('show images')
-  plt.figure(figsize=(10, 10))
-  for images, labels in train_ds.take(1):
-    for i in range(9):
-      ax = plt.subplot(3, 3, i + 1)
-      plt.imshow(images[i].numpy().astype("uint8"))
-      plt.title(class_names[labels[i]])
-      plt.axis("off")
-  plt.show()
+  # print('show images')
+  # plt.figure(figsize=(10, 10))
+  # for images, labels in train_ds.take(1):
+  #   for i in range(9):
+  #     ax = plt.subplot(3, 3, i + 1)
+  #     plt.imshow(images[i].numpy().astype("uint8"))
+  #     plt.title(class_names[labels[i]])
+  #     plt.axis("off")
+  # plt.show()
 
   ## augmentation
   data_augmentation = keras.Sequential(
@@ -81,7 +93,11 @@ if TRAIN_MODEL:
                                     3)),
       layers.RandomRotation(0.1),
       layers.RandomZoom(0.1),
-      layers.RandomCrop(img_height,img_width),
+      #layers.RandomFlip(),
+      layers.RandomCrop(int(img_height*0.75),int(img_width*0.75), seed=123),
+      layers.RandomTranslation(0.1,0.1),
+      #layers.RandomContrast(0.05, seed=123),
+      layers.RandomBrightness(0.05, seed=123)
     ]
   )
 
@@ -95,7 +111,7 @@ if TRAIN_MODEL:
       plt.imshow(augmented_images[0].numpy().astype("uint8"))
       plt.axis("off")
   plt.show()
-
+  #
   print('augmented images 2')
   plt.figure(figsize=(10, 10))
   for images, _ in train_ds.take(2):
@@ -155,15 +171,15 @@ if TRAIN_MODEL:
   model = tf.keras.Sequential([
     data_augmentation,
     tf.keras.layers.Rescaling(1./255),
-    tf.keras.layers.Conv2D(32, 3, activation='relu'),
+    tf.keras.layers.Conv2D(CONV_LYR_1_FLTRS, 3, activation='relu'),
     tf.keras.layers.MaxPooling2D(),
-    tf.keras.layers.Conv2D(32, 3, activation='relu'),
+    tf.keras.layers.Conv2D(CONV_LYR_2_FLTRS, 3, activation='relu'),
     tf.keras.layers.MaxPooling2D(),
-    tf.keras.layers.Conv2D(32, 3, activation='relu'),
-    tf.keras.layers.MaxPooling2D(),
-    tf.keras.layers.Dropout(0.2),
+    #tf.keras.layers.Conv2D(64, 3, activation='relu'),
+    #tf.keras.layers.MaxPooling2D(),
+    tf.keras.layers.Dropout(DROPOUT_LYR_VAL),
     tf.keras.layers.Flatten(),
-    tf.keras.layers.Dense(128, activation='relu'),
+    tf.keras.layers.Dense(DENSE_LYR_FINAL_UNITS, activation='relu'),
     tf.keras.layers.Dense(num_classes)
   ])
 
@@ -173,7 +189,6 @@ if TRAIN_MODEL:
     loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits=True),
     metrics=['accuracy'])
 
-  """Note: You will only train for a few epochs so this tutorial runs quickly."""
   # train model
   history = model.fit(
     train_ds,
@@ -190,18 +205,24 @@ if TRAIN_MODEL:
 
   epochs_range = range(EPOCHS)
 
-  plt.figure(figsize=(8, 8))
+  fig = plt.figure(figsize=(8, 8))
+  fig.suptitle('Model training and performance')
+
   plt.subplot(1, 2, 1)
   plt.plot(epochs_range, acc, label='Training Accuracy')
   plt.plot(epochs_range, val_acc, label='Validation Accuracy')
   plt.legend(loc='lower right')
-  plt.title('Training and Validation Accuracy')
+  plt.title('Tr. & Val. Acc. '+ 'CONV1:'+str(CONV_LYR_1_FLTRS)+',CONV2:'+ str(CONV_LYR_2_FLTRS)+',DRP:'+ str(DROPOUT_LYR_VAL)+',DNS:'+ str(DENSE_LYR_FINAL_UNITS))
 
   plt.subplot(1, 2, 2)
   plt.plot(epochs_range, loss, label='Training Loss')
   plt.plot(epochs_range, val_loss, label='Validation Loss')
   plt.legend(loc='upper right')
   plt.title('Training and Validation Loss')
+
+  # some text
+  #plt.text(4, 1, '6 inches x 2 inches')
+
   plt.show()
 
   # save model
@@ -218,34 +239,66 @@ if LOAD_MODEL:
 #############################################################################
 # try network out
 #############################################################################
+# FOR ALL TEST IMAGES IN TEST FOLDER!
+for folder in ['Arthos', 'Anton', 'Mama-Baerle']:
+  #print(folder)
 
-# take pic
-sunflower_url = "https://storage.googleapis.com/download.tensorflow.org/example_images/592px-Red_sunflower.jpg"
-sunflower_path = '/Users/floriancarstens/.keras/test_pics/Red_sunflower.jpg'#tf.keras.utils.get_file('Red_sunflower.jpg', origin=sunflower_url, cache_subdir='test_pics')
-# create image array
-# image path
-img_path = '/Users/floriancarstens/.keras/test_pics/'
-# image filename
-img_filename = 'Dandelion3.png'#'Red_sunflower.jpg'
-# image path + name
-img_path_filename = os.path.join(img_path, img_filename)
-print(img_path_filename)
-# load image
-img = tf.keras.utils.load_img(
-    img_path_filename, target_size=(img_height, img_width)
-)
-img_array = tf.keras.utils.img_to_array(img)
-img_array = tf.expand_dims(img_array, 0) # Create a batch
+  no_predictions = 0
+  no_correct = 0
+  no_false = 0
 
-# do predictions
-predictions = model.predict(img_array)
-score = tf.nn.softmax(predictions[0])
+  img_path_curr = os.path.join(img_path, folder)
 
-print(
-    "This image most likely belongs to {} with a {:.2f} percent confidence."
-    .format(class_names[np.argmax(score)], 100 * np.max(score))
-)
+  for img_filename in os.listdir(img_path_curr):
+    # create image array
+    # image path + name
+    img_path_filename = os.path.join(img_path_curr, img_filename)
+    #print(img_path_filename)
+    # only if valid image
+    if img_filename.endswith(".jpeg"):
+      # load image
+      img_test = tf.keras.utils.load_img(
+        img_path_filename, target_size=(img_height, img_width)
+      )
+      img_array = tf.keras.utils.img_to_array(img_test)
+      img_array = tf.expand_dims(img_array, 0)  # Create a batch
 
+      # do predictions
+      predictions = model.predict(img_array)
+      score = tf.nn.softmax(predictions[0])
+
+      #print(
+      #  "This image most likely belongs to {} with a {:.2f} percent confidence."
+      #  .format(class_names[np.argmax(score)], 100 * np.max(score))
+      #)
+      no_predictions += 1
+      if class_names[np.argmax(score)] == folder:
+        no_correct += 1
+      else:
+        no_false += 1
+        if SHOW_FALSE_IMAGES:
+          # show test image
+          if np.max(score) > 0.8:
+            img_font_color = 'red'
+          elif np.max(score) > 0.6:
+            img_font_color = 'orange'
+          else:
+            img_font_color = 'blue'
+
+          imgplot = plt.imshow(img_test)
+          plt.title("Is " + folder + " predicts {} with a {:.2f} percent confidence."
+                    .format(class_names[np.argmax(score)], 100 * np.max(score)), {'color':img_font_color, 'size':16})
+          plt.show()
+      continue
+    else:
+      print("No valid image file!")
+      continue
+
+  print('########### Predictions for ' + folder + '###########')
+  print('no of predictions = ' + str(no_predictions))
+  print('number of correct predictions = ' + str(no_correct))
+  print('number of false predictions = ' + str(no_false))
+  print('current accuracy = ' + str(100 * no_correct / no_predictions))
 #############################################################################
 # save model or load lite model
 #############################################################################
