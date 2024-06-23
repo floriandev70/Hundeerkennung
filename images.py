@@ -276,20 +276,12 @@ for folder in ['Arthos', 'Anton', 'Mama-Baerle']:
         no_correct += 1
       else:
         no_false += 1
-        if SHOW_FALSE_IMAGES:
-          # show test image
-          if np.max(score) > 0.8:
-            img_font_color = 'red'
-          elif np.max(score) > 0.6:
-            img_font_color = 'orange'
-          else:
-            img_font_color = 'blue'
-
-          imgplot = plt.imshow(img_test)
-          plt.title("Is " + folder + " predicts {} with a {:.2f} percent confidence."
-                    .format(class_names[np.argmax(score)], 100 * np.max(score)), {'color':img_font_color, 'size':16})
-          plt.show()
+        imgplot = plt.imshow(img_test)
+        plt.title("Is " + folder + " predicts {} with a {:.2f} percent confidence."
+                  .format(class_names[np.argmax(score)], 100 * np.max(score)), {'color':'red', 'size':16})
+        plt.show()
       continue
+      #else
     else:
       print("No valid image file!")
       continue
