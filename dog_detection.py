@@ -1,9 +1,9 @@
 '''
-Can classify my trained dogs through pics in classes
-1. Anton
-2. Arthos
-3. Mama-Baerle
+Can detect my trained dogs through cam and
+1. classify them
+2. draw a box around them
 '''
+
 import numpy as np
 import os
 import PIL
